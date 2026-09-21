@@ -2,7 +2,7 @@
 ## Title: XanaBars
 ## Notes: Shows the normal (keyboard/mouse) action bars while the Gamepad UI is enabled.
 ## Author: Srdan Nikolic
-## Version: 1.1.0
+## Version: 1.2.0
 ## SavedVariables: XanaBarsDB
 ## Category: Xana
 

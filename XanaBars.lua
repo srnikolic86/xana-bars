@@ -28,6 +28,18 @@ local function Print(msg)
 end
 
 ---------------------------------------------------------------------------
+-- Combat lockdown helper: protected changes wait until combat ends
+---------------------------------------------------------------------------
+local pending = {}
+local function AfterCombat(key, fn)
+	if InCombatLockdown() then
+		pending[key] = fn
+	else
+		fn()
+	end
+end
+
+---------------------------------------------------------------------------
 -- Saved variables
 ---------------------------------------------------------------------------
 local function InitDB()
@@ -50,14 +62,86 @@ local function InitDB()
 end
 
 ---------------------------------------------------------------------------
--- Combat lockdown helper: protected changes wait until combat ends
+-- Settings macro. The Forever beta writes SavedVariables at logout but never
+-- loads them back, so the settings are also kept in an account macro whose
+-- body is a no-op "/xbdata ..." line, and read from there at login:
+--   /xbdata 1|<a=auto, w=always>|scale|alpha|empty|hotkeys|<bar>;<bar>;...
+--   <bar> = enabled,cols,anchor,x,y
 ---------------------------------------------------------------------------
-local pending = {}
-local function AfterCombat(key, fn)
-	if InCombatLockdown() then
-		pending[key] = fn
-	else
-		fn()
+local MACRO_NAME = "XanaBars"
+local DATA_TAG = "/xbdata "
+local ANCHOR_CODES = {
+	TOPLEFT = "TL", TOP = "T", TOPRIGHT = "TR", LEFT = "L", CENTER = "C",
+	RIGHT = "R", BOTTOMLEFT = "BL", BOTTOM = "B", BOTTOMRIGHT = "BR",
+}
+local CODE_ANCHORS = {}
+for anchor, code in pairs(ANCHOR_CODES) do CODE_ANCHORS[code] = anchor end
+
+local macrosReady, saveWanted, warnedMacro
+
+local function Clamp(v, lo, hi) return math.max(lo, math.min(hi, v)) end
+local function Round(v) return math.floor(v + 0.5) end
+
+local function FindSettingsMacro()
+	for i = 1, (MAX_ACCOUNT_MACROS or 120) + (MAX_CHARACTER_MACROS or 30) do
+		local name, _, body = GetMacroInfo(i)
+		if name and body and body:find(DATA_TAG, 1, true) then return i end
+	end
+end
+
+local function EncodeSettings()
+	local parts = {}
+	for i, b in ipairs(db.bars) do
+		parts[i] = ("%d,%d,%s,%d,%d"):format(b.enabled and 1 or 0, b.cols,
+			ANCHOR_CODES[b.point[1]] or "C", Round(b.point[3]), Round(b.point[4]))
+	end
+	return ("%s1|%s|%g|%g|%d|%d|%s"):format(DATA_TAG, db.mode == "always" and "w" or "a",
+		db.scale, db.alpha, db.showEmpty and 1 or 0, db.hotkeys and 1 or 0, table.concat(parts, ";"))
+end
+
+-- Copies the settings macro into db. Returns true if one was found.
+local function LoadSettingsMacro()
+	local index = FindSettingsMacro()
+	if not index then return false end
+	local _, _, body = GetMacroInfo(index)
+	local data = body:match("/xbdata ([^\n]*)") or ""
+	local version, mode, scale, alpha, empty, hotkeys, barData = strsplit("|", data)
+	if version ~= "1" then return false end
+	db.mode = (mode == "w") and "always" or "auto"
+	db.scale = Clamp(tonumber(scale) or 1, 0.5, 2)
+	db.alpha = Clamp(tonumber(alpha) or 1, 0.1, 1)
+	db.showEmpty = (empty ~= "0")
+	db.hotkeys = (hotkeys ~= "0")
+	for i, entry in ipairs({ strsplit(";", barData or "") }) do
+		local b = db.bars[i]
+		local enabled, cols, code, x, y = strsplit(",", entry)
+		local anchor = code and CODE_ANCHORS[code]
+		if b and tonumber(cols) and anchor and tonumber(x) and tonumber(y) then
+			b.enabled = (enabled == "1")
+			b.cols = Clamp(math.floor(tonumber(cols)), 1, NUM_BUTTONS)
+			b.point = { anchor, anchor, tonumber(x), tonumber(y) }
+		end
+	end
+	return true
+end
+
+-- Macros can't be edited in combat, and must not be written before the
+-- existing ones have loaded (or a second settings macro would be created).
+local function SaveSettings()
+	if InCombatLockdown() then AfterCombat("save", SaveSettings) return end
+	if not macrosReady then saveWanted = true return end
+	local body = EncodeSettings()
+	local index = FindSettingsMacro()
+	if index then
+		local _, _, old = GetMacroInfo(index)
+		if old ~= body then EditMacro(index, nil, nil, body) end
+		return
+	end
+	local ok, created = pcall(CreateMacro, MACRO_NAME, 134400, body, nil)
+	if (not ok or not created or created == 0) and not warnedMacro then
+		warnedMacro = true
+		Print("Couldn't create the XanaBars settings macro (are your account macro slots full?). " ..
+			"Settings won't survive a logout until one is free.")
 	end
 end
 
@@ -250,6 +334,7 @@ function StopDrag()
 	local point = vp .. hp
 	if point == "" then point = "CENTER" end
 	db.bars[index].point = { point, point, x, y }
+	SaveSettings()
 
 	if not InCombatLockdown() then
 		bar:ClearAllPoints()
@@ -431,6 +516,11 @@ local function Status()
 	end
 end
 
+local SAVING_COMMANDS = {
+	mode = true, bar = true, cols = true, scale = true, alpha = true,
+	empty = true, hotkeys = true, reset = true,
+}
+
 SLASH_XANABARS1 = "/xbars"
 SlashCmdList.XANABARS = function(msg)
 	if not header then return end
@@ -472,6 +562,7 @@ SlashCmdList.XANABARS = function(msg)
 	else
 		Help()
 	end
+	if SAVING_COMMANDS[cmd] then SaveSettings() end
 	if InCombatLockdown() and next(pending) then
 		Print("in combat - the change will apply when combat ends.")
 	end
@@ -480,18 +571,32 @@ end
 ---------------------------------------------------------------------------
 -- Events
 ---------------------------------------------------------------------------
+-- Runs once, as soon as the player's macros are known to be loaded.
+local function OnMacrosReady()
+	if macrosReady then return end
+	macrosReady = true
+	if LoadSettingsMacro() then ApplyAll() end
+	if saveWanted then
+		saveWanted = nil
+		SaveSettings()
+	end
+end
+
 local events = CreateFrame("Frame")
 events:RegisterEvent("PLAYER_LOGIN")
 events:SetScript("OnEvent", function(self, event)
 	if event == "PLAYER_LOGIN" then
 		InitDB()
 		if not CreateBars() then return end
+		local accountMacros, characterMacros = GetNumMacros()
+		if (accountMacros or 0) + (characterMacros or 0) > 0 then OnMacrosReady() end
 		ApplyAll()
 
 		for _, e in ipairs({
 			"PLAYER_ENTERING_WORLD", "PLAYER_REGEN_ENABLED", "PLAYER_REGEN_DISABLED",
 			"ACTIONBAR_SLOT_CHANGED", "ACTIONBAR_PAGE_CHANGED", "UPDATE_BONUS_ACTIONBAR",
 			"UPDATE_SHAPESHIFT_FORM", "UPDATE_BINDINGS", "ACTIONBAR_SHOWGRID", "ACTIONBAR_HIDEGRID",
+			"UPDATE_MACROS",
 		}) do
 			pcall(self.RegisterEvent, self, e)
 		end
@@ -520,8 +625,13 @@ events:SetScript("OnEvent", function(self, event)
 		gridShown = true
 	elseif event == "ACTIONBAR_HIDEGRID" then
 		gridShown = false
+	elseif event == "UPDATE_MACROS" then
+		OnMacrosReady()
+		return
 	elseif event == "PLAYER_ENTERING_WORLD" then
 		ApplyAll()
+		-- Fallback for a player with no macros at all, where no macro event may come.
+		C_Timer.After(2, OnMacrosReady)
 	end
 	RefreshButtons()
 	C_Timer.After(0.1, RefreshButtons)

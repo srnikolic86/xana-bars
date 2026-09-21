@@ -3,7 +3,7 @@
 Shows the normal (keyboard/mouse) action bars in World of Warcraft: Forever
 while the built-in Gamepad UI is turned on.
 
-Version 1.1.0, written for the WoW Forever beta (interface 16001).
+Version 1.2.0, written for the WoW Forever beta (interface 16001).
 Not yet tested in game. The Gamepad UI is still marked Alpha, so a game
 patch may break the addon until it is updated.
 
@@ -86,7 +86,12 @@ The addon does not change or re-show Blizzard's own bars.
 - Quick Keybind Mode works on these buttons: hover a button and press a key.
   It sets the game's normal binding for that slot (for example Action
   Button 3 or Bottom Left Bar Button 5), the same one the default bars use.
-- Settings are saved per account in `WTF/.../SavedVariables/XanaBars.lua`.
+- Settings are saved per account in a general macro named "XanaBars" (its
+  body is a single `/xbdata ...` line). The Forever beta doesn't load addon
+  saved settings between sessions, so the macro is what carries them over.
+  Don't delete or edit it; renaming it or changing its icon is fine. It needs
+  one free account macro slot, and it is created the first time you change a
+  setting or move a bar.
 
 ## Troubleshooting
 
@@ -96,6 +101,12 @@ The addon does not change or re-show Blizzard's own bars.
   or use `/xbars mode always`.
 - Check that each bar is "on" in the status list.
 - Try `/xbars reset` in case a bar was dragged off screen.
+
+**Settings are lost after logging out**
+
+- Check that the "XanaBars" macro exists in the General tab of the macro
+  window (`/macro`). If your account macro slots are full, XanaBars can't
+  create it and says so in chat; free a slot and change any setting.
 
 **"Could not create action buttons" message**
 
@@ -110,4 +121,5 @@ The addon does not change or re-show Blizzard's own bars.
 ## Uninstall
 
 Delete the `Interface/AddOns/XanaBars` folder. To remove saved settings too,
-delete `XanaBars.lua` and `XanaBars.lua.bak` from the `SavedVariables` folder.
+delete the "XanaBars" macro, and `XanaBars.lua` and `XanaBars.lua.bak` from the
+`SavedVariables` folder.

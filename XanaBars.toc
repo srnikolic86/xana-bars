@@ -1,0 +1,8 @@
+## Interface: 16001
+## Title: XanaBars
+## Notes: Shows the normal (keyboard/mouse) action bars while the Gamepad UI is enabled.
+## Version: 1.1.0
+## SavedVariables: XanaBarsDB
+## Category-enUS: Action Bars
+
+XanaBars.lua

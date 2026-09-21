@@ -63,8 +63,8 @@ end
 
 ---------------------------------------------------------------------------
 -- Settings macro. The Forever beta writes SavedVariables at logout but never
--- loads them back, so the settings are also kept in an account macro whose
--- body is a no-op "/xbdata ..." line, and read from there at login:
+-- loads them back, so the settings are also kept in a character-specific macro
+-- whose body is a no-op "/xbdata ..." line, and read from there at login:
 --   /xbdata 1|<a=auto, w=always>|scale|alpha|empty|hotkeys|<bar>;<bar>;...
 --   <bar> = enabled,cols,anchor,x,y
 ---------------------------------------------------------------------------
@@ -82,29 +82,31 @@ local macrosReady, saveWanted, warnedMacro
 local function Clamp(v, lo, hi) return math.max(lo, math.min(hi, v)) end
 local function Round(v) return math.floor(v + 0.5) end
 
+-- Only character-specific macros count. General (account) macros fill indexes
+-- 1..numAccount with no gaps and character macros come after them; the scan end
+-- just needs to be beyond the last possible macro index on any client.
+local MACRO_SCAN_END = 300
+
 local function FindSettingsMacro()
-	for i = 1, (MAX_ACCOUNT_MACROS or 120) + (MAX_CHARACTER_MACROS or 30) do
+	for i = (GetNumMacros() or 0) + 1, MACRO_SCAN_END do
 		local name, _, body = GetMacroInfo(i)
 		if name and body and body:find(DATA_TAG, 1, true) then return i end
 	end
 end
 
-local function EncodeSettings()
+-- The settings as one line (without the macro's "/xbdata " tag).
+local function SettingsData()
 	local parts = {}
 	for i, b in ipairs(db.bars) do
 		parts[i] = ("%d,%d,%s,%d,%d"):format(b.enabled and 1 or 0, b.cols,
 			ANCHOR_CODES[b.point[1]] or "C", Round(b.point[3]), Round(b.point[4]))
 	end
-	return ("%s1|%s|%g|%g|%d|%d|%s"):format(DATA_TAG, db.mode == "always" and "w" or "a",
+	return ("1|%s|%g|%g|%d|%d|%s"):format(db.mode == "always" and "w" or "a",
 		db.scale, db.alpha, db.showEmpty and 1 or 0, db.hotkeys and 1 or 0, table.concat(parts, ";"))
 end
 
--- Copies the settings macro into db. Returns true if one was found.
-local function LoadSettingsMacro()
-	local index = FindSettingsMacro()
-	if not index then return false end
-	local _, _, body = GetMacroInfo(index)
-	local data = body:match("/xbdata ([^\n]*)") or ""
+-- Copies a SettingsData() line into db. Returns false if it isn't one.
+local function ApplySettingsData(data)
 	local version, mode, scale, alpha, empty, hotkeys, barData = strsplit("|", data)
 	if version ~= "1" then return false end
 	db.mode = (mode == "w") and "always" or "auto"
@@ -125,22 +127,30 @@ local function LoadSettingsMacro()
 	return true
 end
 
+-- Copies the settings macro into db. Returns true if one was found.
+local function LoadSettingsMacro()
+	local index = FindSettingsMacro()
+	if not index then return false end
+	local _, _, body = GetMacroInfo(index)
+	return ApplySettingsData(body:match("/xbdata ([^\n]*)") or "")
+end
+
 -- Macros can't be edited in combat, and must not be written before the
 -- existing ones have loaded (or a second settings macro would be created).
 local function SaveSettings()
 	if InCombatLockdown() then AfterCombat("save", SaveSettings) return end
 	if not macrosReady then saveWanted = true return end
-	local body = EncodeSettings()
+	local body = DATA_TAG .. SettingsData()
 	local index = FindSettingsMacro()
 	if index then
 		local _, _, old = GetMacroInfo(index)
 		if old ~= body then EditMacro(index, nil, nil, body) end
 		return
 	end
-	local ok, created = pcall(CreateMacro, MACRO_NAME, 134400, body, nil)
+	local ok, created = pcall(CreateMacro, MACRO_NAME, 134400, body, true)
 	if (not ok or not created or created == 0) and not warnedMacro then
 		warnedMacro = true
-		Print("Couldn't create the XanaBars settings macro (are your account macro slots full?). " ..
+		Print("Couldn't create the XanaBars settings macro (are this character's macro slots full?). " ..
 			"Settings won't survive a logout until one is free.")
 	end
 end
@@ -490,6 +500,126 @@ local function CreateBars()
 end
 
 ---------------------------------------------------------------------------
+-- Export / import strings: "XB1:" + base64 of SettingsData().
+-- Base64 keeps "|" out of the edit box, where WoW would read it as an escape code.
+---------------------------------------------------------------------------
+local EXPORT_PREFIX = "XB1:"
+local B64 = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
+
+local function Base64Encode(s)
+	local out = {}
+	for i = 1, #s, 3 do
+		local a, b, c = s:byte(i, i + 2)
+		local n = a * 65536 + (b or 0) * 256 + (c or 0)
+		local d1, d2 = math.floor(n / 262144) % 64, math.floor(n / 4096) % 64
+		local d3, d4 = math.floor(n / 64) % 64, n % 64
+		out[#out + 1] = B64:sub(d1 + 1, d1 + 1) .. B64:sub(d2 + 1, d2 + 1)
+			.. (b and B64:sub(d3 + 1, d3 + 1) or "=") .. (c and B64:sub(d4 + 1, d4 + 1) or "=")
+	end
+	return table.concat(out)
+end
+
+-- Returns nil for anything that isn't valid base64.
+local function Base64Decode(s)
+	s = s:gsub("%s", "")
+	if #s % 4 ~= 0 then return nil end
+	local out = {}
+	for i = 1, #s, 4 do
+		local n, pad = 0, 0
+		for j = i, i + 3 do
+			local ch = s:sub(j, j)
+			local v = B64:find(ch, 1, true)
+			if ch == "=" and j >= i + 2 then
+				pad, n = pad + 1, n * 64
+			elseif v and pad == 0 then
+				n = n * 64 + v - 1
+			else
+				return nil
+			end
+		end
+		out[#out + 1] = string.char(math.floor(n / 65536) % 256)
+			.. (pad < 2 and string.char(math.floor(n / 256) % 256) or "")
+			.. (pad < 1 and string.char(n % 256) or "")
+	end
+	return table.concat(out)
+end
+
+-- Returns true if the string was valid.
+local function ImportSettings(text)
+	text = strtrim(text or "")
+	local data = text:sub(1, #EXPORT_PREFIX) == EXPORT_PREFIX and Base64Decode(text:sub(#EXPORT_PREFIX + 1))
+	if not data or not ApplySettingsData(data) then
+		Print("That isn't a XanaBars export string.")
+		return false
+	end
+	StopDrag()
+	ApplyAll()
+	SaveSettings()
+	Print("Bar settings imported.")
+	return true
+end
+
+-- Window with one text box: shows an export string to copy, or takes one to import.
+local dialog = CreateFrame("Frame", "XanaBarsDialog", UIParent)
+dialog:SetSize(480, 130)
+dialog:SetPoint("CENTER", 0, 150)
+dialog:SetFrameStrata("FULLSCREEN_DIALOG")
+dialog:EnableMouse(true)
+dialog:Hide()
+tinsert(UISpecialFrames, "XanaBarsDialog") -- Escape closes it
+dialog.bg = dialog:CreateTexture(nil, "BACKGROUND")
+dialog.bg:SetAllPoints()
+dialog.bg:SetColorTexture(0, 0, 0, 0.85)
+dialog.title = dialog:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
+dialog.title:SetPoint("TOP", 0, -12)
+dialog.hint = dialog:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+dialog.hint:SetPoint("TOP", 0, -36)
+
+dialog.box = CreateFrame("EditBox", nil, dialog, "InputBoxTemplate")
+dialog.box:SetSize(440, 24)
+dialog.box:SetPoint("TOP", 0, -56)
+dialog.box:SetAutoFocus(false)
+dialog.box:SetMaxLetters(0)
+
+dialog.action = CreateFrame("Button", nil, dialog, "UIPanelButtonTemplate")
+dialog.action:SetSize(100, 22)
+dialog.action:SetPoint("BOTTOM", -56, 14)
+dialog.action:SetText("Import")
+dialog.action:SetScript("OnClick", function()
+	if ImportSettings(dialog.box:GetText()) then dialog:Hide() end
+end)
+
+dialog.close = CreateFrame("Button", nil, dialog, "UIPanelButtonTemplate")
+dialog.close:SetSize(100, 22)
+dialog.close:SetText(CLOSE or "Close")
+dialog.close:SetScript("OnClick", function() dialog:Hide() end)
+
+dialog.box:SetScript("OnEscapePressed", function() dialog:Hide() end)
+dialog.box:SetScript("OnEnterPressed", function()
+	if dialog.mode == "import" then dialog.action:Click() end
+end)
+dialog.box:SetScript("OnTextChanged", function(self, userInput)
+	-- An export string stays as it is, whatever gets typed into it.
+	if userInput and dialog.mode == "export" then
+		self:SetText(dialog.exportText)
+		self:HighlightText()
+	end
+end)
+
+function dialog:Open(mode, title, hint, text)
+	self.mode, self.exportText = mode, text
+	self.title:SetText(title)
+	self.hint:SetText(hint)
+	self.action:SetShown(mode == "import")
+	self.close:ClearAllPoints()
+	self.close:SetPoint("BOTTOM", mode == "import" and 56 or 0, 14)
+	self.box:SetText(text or "")
+	self:Show()
+	self.box:SetFocus()
+	self.box:HighlightText()
+end
+
+---------------------------------------------------------------------------
 -- Slash commands
 ---------------------------------------------------------------------------
 local function OnOff(v) return v and "|cff55ff55on|r" or "|cffff5555off|r" end
@@ -504,6 +634,7 @@ local function Help()
 	Print("  /xbars empty on | off  - show empty slots")
 	Print("  /xbars hotkeys on | off  - show keyboard binding text")
 	Print("  /xbars status | reset")
+	Print("  /xbars export | import  - copy the bar settings to another character")
 end
 
 local function Status()
@@ -554,6 +685,13 @@ SlashCmdList.XANABARS = function(msg)
 		RefreshButtons()
 	elseif cmd == "status" then
 		Status()
+	elseif cmd == "export" then
+		dialog:Open("export", "Export bar settings",
+			"Press Ctrl+C to copy, then paste it into /xbars import on another character.",
+			EXPORT_PREFIX .. Base64Encode(SettingsData()))
+	elseif cmd == "import" then
+		dialog:Open("import", "Import bar settings",
+			"Paste an export string with Ctrl+V. It replaces all current bar settings.")
 	elseif cmd == "reset" then
 		XanaBarsDB = nil
 		InitDB()

@@ -4,6 +4,6 @@
 ## Author: Srdan Nikolic
 ## Version: 1.1.0
 ## SavedVariables: XanaBarsDB
-## Category-enUS: Action Bars
+## Category: Xana
 
 XanaBars.lua

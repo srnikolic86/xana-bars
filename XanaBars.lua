@@ -560,13 +560,16 @@ local function ImportSettings(text)
 end
 
 -- Window with one text box: shows an export string to copy, or takes one to import.
+-- It never moves keyboard focus by itself: doing that from addon code got the
+-- addon blocked (and crashed the Forever beta client), so the player clicks the
+-- box instead. For the same reason it is a plain EditBox, not InputBoxTemplate,
+-- and not registered in UISpecialFrames.
 local dialog = CreateFrame("Frame", "XanaBarsDialog", UIParent)
 dialog:SetSize(480, 130)
 dialog:SetPoint("CENTER", 0, 150)
 dialog:SetFrameStrata("FULLSCREEN_DIALOG")
 dialog:EnableMouse(true)
 dialog:Hide()
-tinsert(UISpecialFrames, "XanaBarsDialog") -- Escape closes it
 dialog.bg = dialog:CreateTexture(nil, "BACKGROUND")
 dialog.bg:SetAllPoints()
 dialog.bg:SetColorTexture(0, 0, 0, 0.85)
@@ -575,11 +578,18 @@ dialog.title:SetPoint("TOP", 0, -12)
 dialog.hint = dialog:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
 dialog.hint:SetPoint("TOP", 0, -36)
 
-dialog.box = CreateFrame("EditBox", nil, dialog, "InputBoxTemplate")
+dialog.box = CreateFrame("EditBox", nil, dialog)
 dialog.box:SetSize(440, 24)
 dialog.box:SetPoint("TOP", 0, -56)
+dialog.box:SetFontObject(ChatFontNormal)
+dialog.box:SetTextInsets(6, 6, 0, 0)
 dialog.box:SetAutoFocus(false)
 dialog.box:SetMaxLetters(0)
+dialog.box.bg = dialog.box:CreateTexture(nil, "BACKGROUND")
+dialog.box.bg:SetAllPoints()
+dialog.box.bg:SetColorTexture(1, 1, 1, 0.12)
+dialog.box:SetScript("OnEditFocusGained", function(self) self:HighlightText() end)
+dialog.box:SetScript("OnEditFocusLost", function(self) self:HighlightText(0, 0) end)
 
 dialog.action = CreateFrame("Button", nil, dialog, "UIPanelButtonTemplate")
 dialog.action:SetSize(100, 22)
@@ -606,18 +616,28 @@ dialog.box:SetScript("OnTextChanged", function(self, userInput)
 	end
 end)
 
+-- Opens on the next frame, so the chat box that ran the slash command has
+-- finished closing first.
 function dialog:Open(mode, title, hint, text)
-	self.mode, self.exportText = mode, text
-	self.title:SetText(title)
-	self.hint:SetText(hint)
-	self.action:SetShown(mode == "import")
-	self.close:ClearAllPoints()
-	self.close:SetPoint("BOTTOM", mode == "import" and 56 or 0, 14)
-	self.box:SetText(text or "")
-	self:Show()
-	self.box:SetFocus()
-	self.box:HighlightText()
+	C_Timer.After(0, function()
+		self.mode, self.exportText = mode, text
+		self.title:SetText(title)
+		self.hint:SetText(hint)
+		self.action:SetShown(mode == "import")
+		self.close:ClearAllPoints()
+		self.close:SetPoint("BOTTOM", mode == "import" and 56 or 0, 14)
+		self.box:SetText(text or "")
+		self:Show()
+	end)
 end
+
+-- If anything still gets blocked, say which function it was.
+local blockWatch = CreateFrame("Frame")
+blockWatch:RegisterEvent("ADDON_ACTION_FORBIDDEN")
+blockWatch:RegisterEvent("ADDON_ACTION_BLOCKED")
+blockWatch:SetScript("OnEvent", function(_, event, addon, fn)
+	if addon == ADDON then Print(("%s: the game blocked %s"):format(event, tostring(fn))) end
+end)
 
 ---------------------------------------------------------------------------
 -- Slash commands
@@ -687,11 +707,11 @@ SlashCmdList.XANABARS = function(msg)
 		Status()
 	elseif cmd == "export" then
 		dialog:Open("export", "Export bar settings",
-			"Press Ctrl+C to copy, then paste it into /xbars import on another character.",
+			"Click the box, then press Ctrl+C. Paste it into /xbars import on another character.",
 			EXPORT_PREFIX .. Base64Encode(SettingsData()))
 	elseif cmd == "import" then
 		dialog:Open("import", "Import bar settings",
-			"Paste an export string with Ctrl+V. It replaces all current bar settings.")
+			"Click the box and paste an export string with Ctrl+V. It replaces all current bar settings.")
 	elseif cmd == "reset" then
 		XanaBarsDB = nil
 		InitDB()

@@ -3,8 +3,8 @@
 Shows the normal (keyboard/mouse) action bars in World of Warcraft: Forever
 while the built-in Gamepad UI is turned on.
 
-Version 1.3.0, written for the WoW Forever beta (interface 16001).
-Not yet tested in game. The Gamepad UI is still marked Alpha, so a game
+Version 1.3.0, for WoW Forever (interface 16001). Tested in game.
+The Gamepad UI is still marked Alpha, so a game
 patch may break the addon until it is updated.
 
 ## Install
@@ -80,8 +80,8 @@ The addon does not change or re-show Blizzard's own bars.
   restriction). Changes made in combat apply when combat ends.
 - Hidden empty slots still accept a dragged spell; they appear while you
   are holding one.
-- The bars show your normal keyboard action slots. Beta testers report that
-  the Gamepad UI keeps its controller abilities in a separate layout, so
+- The bars show your normal keyboard action slots. The Gamepad UI keeps
+  its controller abilities in a separate layout, so
   these bars are not a copy of the controller bars.
 - The hotkey text shows your keyboard bindings for the matching default
   bar buttons (Action Button 1-12, Bottom Left Bar, and so on).
@@ -89,7 +89,7 @@ The addon does not change or re-show Blizzard's own bars.
   It sets the game's normal binding for that slot (for example Action
   Button 3 or Bottom Left Bar Button 5), the same one the default bars use.
 - Settings are saved per character, in a character-specific macro named
-  "XanaBars" (its body is a single `/xbdata ...` line). The Forever beta
+  "XanaBars" (its body is a single `/xbdata ...` line). The Forever client
   doesn't load addon saved settings between sessions, so the macro is what
   carries them over. Don't delete or edit it; renaming it or changing its
   icon is fine. It needs one free character macro slot, and it is created the

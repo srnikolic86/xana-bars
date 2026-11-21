@@ -1,9 +1,8 @@
 ## Interface: 16001
 ## Title: XanaBars
-## Notes: Shows the normal (keyboard/mouse) action bars while the Gamepad UI is enabled.
+## Notes: Fixed action bars for the Gamepad UI: bar 5 on the right, bars 1-4 shown while F1-F4 are held.
 ## Author: Srdan Nikolic
-## Version: 1.3.0
-## SavedVariablesPerCharacter: XanaBarsDB
+## Version: 2.0.0
 ## Category: Xana
 
 XanaBars.lua

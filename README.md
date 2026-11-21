@@ -1,9 +1,10 @@
 # XanaBars
 
-Shows the normal (keyboard/mouse) action bars in World of Warcraft: Forever
-while the built-in Gamepad UI is turned on.
+Fixed action bars for World of Warcraft: Forever's Gamepad UI. One bar is
+always on the right edge of the screen. Four more appear at the bottom centre
+while you hold F1-F4.
 
-Version 1.3.0, for WoW Forever (interface 16001). Tested in game.
+Version 2.0.0, for WoW Forever (interface 16001).
 The Gamepad UI is still marked Alpha, so a game
 patch may break the addon until it is updated.
 
@@ -28,92 +29,91 @@ patch may break the addon until it is updated.
 
 ## What it does
 
-The Gamepad UI replaces the normal action bars with its own controller bars.
-XanaBars adds its own copies of the normal bars on top of that:
+| # | Bar               | Action slots | When it shows                                   |
+|---|-------------------|--------------|-------------------------------------------------|
+| 1 | Main bar          | 1-12, follows bar pages and stances/forms | while **F1** is held |
+| 2 | Bottom left bar   | 61-72        | while **F2** is held                            |
+| 3 | Bottom right bar  | 49-60        | while **F3** is held                            |
+| 4 | Right bar         | 25-36        | while **F4** is held                            |
+| 5 | Right bar 2       | 37-48        | always, as a column on the right edge           |
 
-| # | Bar               | Notes                                          |
-|---|-------------------|------------------------------------------------|
-| 1 | Main bar          | Slots 1-12, follows bar pages and stances/forms |
-| 2 | Bottom left bar   |                                                |
-| 3 | Bottom right bar  |                                                |
-| 4 | Right bar         | Off by default                                 |
-| 5 | Right bar 2       | Off by default                                 |
+- **Bar 5** is a single vertical column, centred on the right edge of the
+  screen.
+- **Bars 1-4** are hidden until you hold their key. The bar then appears at
+  the bottom centre of the screen, on top of the Gamepad UI's own bars, in
+  the gamepad layout (below) on a solid dark gray background. Let go of the
+  key and it hides again. This works in combat.
 
 The buttons use the game's standard action button template, so icons,
 cooldowns, range/usable colouring, tooltips and drag and drop work as usual.
-Left click casts. Drag spells on and off the same way as on the default bars.
 
-By default the bars appear only while the Gamepad UI is on and hide again
-when it is turned off.
+The layout is fixed: there are no settings to change.
 
-The addon does not change or re-show Blizzard's own bars.
+## Edit mode
+
+Type `/xbars edit` to put spells on bars 1-4. All four bars appear together
+near the top of the screen, in a 2x2 grid:
+
+```
+ Bar 1 (F1)   Bar 2 (F2)
+ Bar 3 (F3)   Bar 4 (F4)
+```
+
+Drag spells, items and macros onto them (or off them) as on the default bars.
+Type `/xbars edit` again when you are done. Edit mode turns itself off when
+combat starts, and can't be turned on in combat.
+
+Bar 5 is always visible, so you can drag spells onto it at any time.
+
+## Gamepad layout
+
+Bars 1-4 place their buttons like a controller's: a D-pad cross on the left,
+a face-button cross on the right, a shoulder button above each, and buttons
+11 and 12 side by side in the middle:
+
+```
+ 1      11 12      10
+     4         8
+  3     5   7     9
+     2         6
+```
+
+| Button | Position       | Button | Position        |
+|--------|----------------|--------|-----------------|
+| 1      | Left shoulder  | 6      | Face down       |
+| 2      | D-pad down     | 7      | Face left       |
+| 3      | D-pad left     | 8      | Face up         |
+| 4      | D-pad up       | 9      | Face right      |
+| 5      | D-pad right    | 10     | Right shoulder  |
+| 11     | Middle, left   | 12     | Middle, right   |
 
 ## Commands
 
-| Command                      | Description                                            |
-|------------------------------|--------------------------------------------------------|
-| `/xbars`                     | List all commands                                      |
-| `/xbars unlock`              | Show blue boxes you can drag to move each bar          |
-| `/xbars lock`                | Hide the boxes and fix the bars in place               |
-| `/xbars mode auto`           | Show bars only while the Gamepad UI is on (default)    |
-| `/xbars mode always`         | Show bars all the time                                 |
-| `/xbars bar <1-5> on\|off`   | Enable or disable a bar                                |
-| `/xbars cols <1-5> <1-12>`   | Buttons per row (e.g. `/xbars cols 1 6` = two rows)    |
-| `/xbars scale <0.5-2>`       | Size of all bars                                       |
-| `/xbars alpha <0.1-1>`       | Transparency of all bars                               |
-| `/xbars empty on\|off`       | Show or hide empty slots                               |
-| `/xbars hotkeys on\|off`     | Show or hide keyboard binding text on buttons          |
-| `/xbars status`              | Show current settings and Gamepad UI detection         |
-| `/xbars reset`               | Restore all default settings and positions             |
-| `/xbars export`              | Show the bar settings as a string you can copy         |
-| `/xbars import`              | Paste a string from `/xbars export` to use its settings |
+| Command              | Description                     |
+|----------------------|---------------------------------|
+| `/xbars`             | Show the usage                  |
+| `/xbars edit`        | Turn edit mode on or off        |
+| `/xbars edit on\|off` | Turn edit mode on, or off       |
 
 ## Good to know
 
-- While unlocked, a dragged bar snaps to nearby bars: edges line up, centres
-  line up, and bars stack next to each other with the same gap as between
-  buttons. It also snaps to the horizontal centre of the screen. Hold Shift
-  while dragging to place a bar freely.
-- The default positions are a guess. Use `/xbars unlock` to place the bars
-  where they do not overlap the controller bars.
-- Bars cannot be moved, resized, shown or hidden during combat (a game
-  restriction). Changes made in combat apply when combat ends.
-- Hidden empty slots still accept a dragged spell; they appear while you
-  are holding one.
-- The bars show your normal keyboard action slots. The Gamepad UI keeps
-  its controller abilities in a separate layout, so
-  these bars are not a copy of the controller bars.
-- The hotkey text shows your keyboard bindings for the matching default
-  bar buttons (Action Button 1-12, Bottom Left Bar, and so on).
+- XanaBars takes over F1-F4 while it is loaded. Whatever they were bound to
+  before (by default, targeting yourself and party members) comes back if
+  you disable the addon.
+- The hotkey text on a button shows your keyboard binding for the matching
+  default bar button (Action Button 1-12, Bottom Left Bar, and so on).
 - Quick Keybind Mode works on these buttons: hover a button and press a key.
-  It sets the game's normal binding for that slot (for example Action
-  Button 3 or Bottom Left Bar Button 5), the same one the default bars use.
-- Settings are saved per character, in a character-specific macro named
-  "XanaBars" (its body is a single `/xbdata ...` line). The Forever client
-  doesn't load addon saved settings between sessions, so the macro is what
-  carries them over. Don't delete or edit it; renaming it or changing its
-  icon is fine. It needs one free character macro slot, and it is created the
-  first time you change a setting or move a bar.
-- To give another character the same layout, run `/xbars export`, press
-  Ctrl+C, log in on the other character, run `/xbars import` and paste with
-  Ctrl+V. Everything is copied: which bars are on, columns, positions,
-  scale, transparency, mode and the empty/hotkeys options.
+  It sets the game's normal binding for that slot, the same one the default
+  bars use.
+- XanaBars saves nothing. Older versions kept their settings in a character
+  macro named "XanaBars"; it is no longer used and you can delete it.
 
 ## Troubleshooting
 
-**Bars do not appear**
+**Holding F1-F4 does nothing**
 
-- Type `/xbars status`. If Gamepad UI shows "off", turn the Gamepad UI on
-  or use `/xbars mode always`.
-- Check that each bar is "on" in the status list.
-- Try `/xbars reset` in case a bar was dragged off screen.
-
-**Settings are lost after logging out**
-
-- Check that the "XanaBars" macro exists in the macro window (`/macro`), on
-  the tab with your character's name. If that character's macro slots are
-  full, XanaBars can't create it and says so in chat; free a slot and change
-  any setting.
+- Make sure edit mode is off (`/xbars edit off`).
+- Another addon may also be overriding F1-F4.
 
 **"Could not create action buttons" message**
 
@@ -123,10 +123,9 @@ The addon does not change or re-show Blizzard's own bars.
 **Lua errors**
 
 - Turn on error display with `/console scriptErrors 1` and note the
-  full error text together with the output of `/xbars status`.
+  full error text.
 
 ## Uninstall
 
-Delete the `Interface/AddOns/XanaBars` folder. To remove saved settings too,
-delete the "XanaBars" macro on each character, and the `XanaBars.lua` and
-`XanaBars.lua.bak` files from each character's folder under `WTF/Account`.
+Delete the `Interface/AddOns/XanaBars` folder. If an old "XanaBars" macro
+is still on a character, delete it too.

@@ -1,10 +1,11 @@
 # XanaBars
 
-Fixed action bars for World of Warcraft: Forever's Gamepad UI. One bar is
-always on the right edge of the screen. Four more appear at the bottom centre
-while you hold F1-F4.
+Fixed action bars for World of Warcraft: Forever's Gamepad UI. Four action
+bars appear at the bottom centre while you hold F1-F4. Below them, just above
+the XP bar, a row of your own spells, items and macros is always shown,
+together with a button holding the addons' minimap icons.
 
-Version 2.0.0, for WoW Forever (interface 16001).
+Version 2.4.0, for WoW Forever (interface 16001).
 The Gamepad UI is still marked Alpha, so a game
 patch may break the addon until it is updated.
 
@@ -35,23 +36,36 @@ patch may break the addon until it is updated.
 | 2 | Bottom left bar   | 61-72        | while **F2** is held                            |
 | 3 | Bottom right bar  | 49-60        | while **F3** is held                            |
 | 4 | Right bar         | 25-36        | while **F4** is held                            |
-| 5 | Right bar 2       | 37-48        | always, as a column on the right edge           |
 
-- **Bar 5** is a single vertical column, centred on the right edge of the
-  screen.
 - **Bars 1-4** are hidden until you hold their key. The bar then appears at
   the bottom centre of the screen, on top of the Gamepad UI's own bars, in
-  the gamepad layout (below) on a solid dark gray background. Let go of the
-  key and it hides again. This works in combat.
+  the gamepad layout (below). Let go of the key and it hides again. This
+  works in combat.
+- **The bottom row** is a list of spells, items and macros that you choose
+  (see Edit mode). It isn't an action bar, so it doesn't use up one of the
+  game's bars. Click an icon to cast or use it; this works in combat. Icons
+  show cooldowns, and items show how many you have.
+- While a held bar is up, the bottom row and the Gamepad UI's own buttons fade almost out of
+  sight, and come back when you let go.
+- **Minimap buttons:** the gear button at the right end of the bottom row holds the
+  icons that addons put around the minimap. Click it to open them in a panel
+  above it; clicking an icon, or the gear again, closes it. Those icons no longer show on the minimap.
+  Blizzard's own minimap buttons (tracking, mail, clock and so on) stay where
+  they are.
+- Every bar, and the bottom row, sits on a solid dark gray panel inside the stone border of the
+  game's classic dialog boxes.
 
-The buttons use the game's standard action button template, so icons,
+Bars 1-4 use the game's standard action button template, so icons,
 cooldowns, range/usable colouring, tooltips and drag and drop work as usual.
 
 The layout is fixed: there are no settings to change.
 
+The first time you log in with this version, whatever was on the old bar 5
+(Right bar 2, action slots 37-48) is copied onto the bottom row.
+
 ## Edit mode
 
-Type `/xbars edit` to put spells on bars 1-4. All four bars appear together
+Type `/xbars edit` to put spells on bars 1-4 and on the bottom row. All four bars appear together
 near the top of the screen, in a 2x2 grid:
 
 ```
@@ -63,7 +77,13 @@ Drag spells, items and macros onto them (or off them) as on the default bars.
 Type `/xbars edit` again when you are done. Edit mode turns itself off when
 combat starts, and can't be turned on in combat.
 
-Bar 5 is always visible, so you can drag spells onto it at any time.
+The bottom row also becomes editable, with an extra **+** slot at its end:
+
+- Drop a spell (from the spellbook), an item (from your bags) or a macro
+  (from the macro window) on **+** to add it, or on an icon to replace it.
+  The replaced one is put on your cursor.
+- Drag an icon off to move it: drop it somewhere else on the row, or on a bar.
+- Right-click an icon to remove it.
 
 ## Gamepad layout
 
@@ -94,6 +114,8 @@ a face-button cross on the right, a shoulder button above each, and buttons
 | `/xbars`             | Show the usage                  |
 | `/xbars edit`        | Turn edit mode on or off        |
 | `/xbars edit on\|off` | Turn edit mode on, or off       |
+| `/xbars frames`      | Show which Gamepad UI frame fades, and whether it was found |
+| `/xbars frames all`  | List every visible frame named like a gamepad or action bar (for troubleshooting) |
 
 ## Good to know
 
@@ -105,8 +127,13 @@ a face-button cross on the right, a shoulder button above each, and buttons
 - Quick Keybind Mode works on these buttons: hover a button and press a key.
   It sets the game's normal binding for that slot, the same one the default
   bars use.
-- XanaBars saves nothing. Older versions kept their settings in a character
-  macro named "XanaBars"; it is no longer used and you can delete it.
+- The bottom row is saved per character in a character macro named
+  "XanaBars" (its body is a single `/xbdata ...` line). The Forever client
+  doesn't load addon saved settings between sessions, so the macro is what
+  carries the list over. Don't delete or edit it; renaming it or changing its
+  icon is fine. It needs one free character macro slot.
+- The row holds as many entries as fit in a 255-character macro: usually
+  about 30 spells or items, fewer macros with long names.
 
 ## Troubleshooting
 
@@ -114,6 +141,25 @@ a face-button cross on the right, a shoulder button above each, and buttons
 
 - Make sure edit mode is off (`/xbars edit off`).
 - Another addon may also be overriding F1-F4.
+
+**The Gamepad UI's buttons don't fade**
+
+- The addon fades the frame named `GamepadMainActionBarFrame`. Type
+  `/xbars frames` to check that it was found. `/xbars frames all` lists other
+  frames named like gamepad or action bars, in case a game patch renames it.
+
+**An addon's minimap icon isn't in the gear button's panel**
+
+- Most addons' icons are found automatically. An icon the addon made without
+  a name, or one smaller than a normal minimap button, is left on the minimap.
+  Tell me the addon and it can be added.
+
+**The bottom row is empty after logging in again**
+
+- Check that the "XanaBars" macro exists in the macro window (`/macro`), on
+  the tab with your character's name. If that character's macro slots are
+  full, XanaBars can't create it and says so in chat; free a slot and change
+  the row.
 
 **"Could not create action buttons" message**
 
@@ -127,5 +173,5 @@ a face-button cross on the right, a shoulder button above each, and buttons
 
 ## Uninstall
 
-Delete the `Interface/AddOns/XanaBars` folder. If an old "XanaBars" macro
-is still on a character, delete it too.
+Delete the `Interface/AddOns/XanaBars` folder, and the "XanaBars" macro on
+each character.
